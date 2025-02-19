@@ -24,7 +24,7 @@ export default function WaitingModal({ onAccepted, onCancel,teacherId,streamId,s
         const requestDocRef = doc(
           db,
           "E-groups",
-          subjectId,
+          "fifth-year-arabic",
           "groups",
           teacherId,
           "livestreams",
@@ -32,6 +32,7 @@ export default function WaitingModal({ onAccepted, onCancel,teacherId,streamId,s
           "requests",
           studentId
         );
+  console.log("sdaSDASDaSdas",requestDocRef.path);
   
         // Check if the document exists
         const docSnap = await getDoc(requestDocRef);
@@ -47,8 +48,12 @@ export default function WaitingModal({ onAccepted, onCancel,teacherId,streamId,s
         // Listen for changes in the document
         unsubscribe = onSnapshot(requestDocRef, (doc) => {
           const data = doc.data();
+          console.log(data);
+          
           if (data) {
             if (data.status === "accepted") {
+              console.log("adsdasdasd");
+              
               onAccepted(); // Trigger accepted callback
             } else if (data.status === "rejected") {
               onCancel(); // Trigger rejected callback
