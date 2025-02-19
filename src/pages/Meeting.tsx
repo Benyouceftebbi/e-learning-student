@@ -1,76 +1,117 @@
+import React, { useEffect, useState } from "react";
 import "./App.css";
-import ZoomMtgEmbedded from "@zoom/meetingsdk/embedded";
+import { ZoomMtg } from "@zoom/meetingsdk";
+import { doc, onSnapshot } from "firebase/firestore";
+import { functions } from "../../firebase/firebaseConfig";
+import { httpsCallable } from "firebase/functions";
 
+
+ZoomMtg.preLoadWasm();
+ZoomMtg.prepareWebSDK();
 
 function Meeting() {
-    const client = ZoomMtgEmbedded.createClient();
-
-  const authEndpoint = "http://localhost:4001"; // http://localhost:4000
-  const sdkKey = "XHMOFl1MTJy1pbMT2NDfZg";
-  const meetingNumber = "89432115485";
-  const passWord = "123456";
-  const role =0;
+  const [isAccepted, setIsAccepted] = useState(false);
+  const authEndpoint = "https://generatezoomsignature-b6inkznkfa-uc.a.run.app"; // Your backend endpoint for signature generation
+  const sdkKey = "XHMOFl1MTJy1pbMT2NDfZg"; // Replace with your SDK Key
+  const meetingNumber = "82553579618"; // Your Meeting ID
+  const passWord = "123456"; // Meeting Password
+  const role = 0; // Role: 0 = attendee, 1 = host
   const userName = "youcef tebbi";
-  const userEmail = "youcefmilk@gmail.com";
-  const zakToken='eyJ0eXAiOiJKV1QiLCJzdiI6IjAwMDAwMSIsInptX3NrbSI6InptX28ybSIsImFsZyI6IkhTMjU2In0.eyJhdWQiOiJjbGllbnRzbSIsInVpZCI6IkFfUHdfa3h6VEVpZVJDUkNxTTVtNEEiLCJ6aWQiOiJlYjhiYjYxZTAzZjA0MzcxOGYyNWNiM2U3MTgxZTlhNyIsImlzcyI6IndlYiIsInNrIjoiMCIsInN0eSI6MSwid2NkIjoidXMwNSIsImNsdCI6MCwiZXhwIjoxNzMzNDI3MDI2LCJpYXQiOjE3MzM0MTk4MjYsImFpZCI6Inc5MFNwdG5HUmQ2X2ZTaGtSMWZBcUEiLCJjaWQiOiIifQ.k53ja60-D8CvKXadyD5CJrJ95HVrZysVbDHPYenldLU'
-  const leaveUrl = "http://localhost:5173";
+  const userEmail = "youcefmilk@gmail.com"; // Optional, used for recording notifications
+
+  // Function to fetch the signature
   const getSignature = async () => {
     try {
-      const req = await fetch(authEndpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          meetingNumber: meetingNumber,
-          role: role,
-          //expirationSeconds:3600
-        }),
+      const generateSignature = httpsCallable(functions, "generateZoomSignature");
+
+      const response = await generateSignature({
+        meetingNumber,
+        role,
+
       });
-      const res = await req.json()
-      const signature = res.signature as string;
-      //console.log("sig",signature);
-      
-      startMeeting(signature)
-    } catch (e) {
-      console.log(e);
+     
+      const signature  = await response.data.signature;
+      console.log("Signature:", signature);
+
+      if (signature) {
+        startMeeting(signature); // Proceed to start the meeting
+      } else {
+        console.error("Signature not received.");
+      }
+    } catch (error) {
+      console.error("Error fetching signature:", error);
     }
   };
-  async function startMeeting(signature: string) {
-    const meetingSDKElement = document.getElementById("meetingSDKElement")!;
-    try {
-      await client.init({
-        zoomAppRoot: meetingSDKElement,
-        language: "en-US",
-        patchJsMedia: true,
-        leaveOnPageUnload: true,
-      })
-      await client.join({
-        signature: signature,
-        sdkKey: sdkKey,
-        meetingNumber: meetingNumber,
-        password: passWord,
-        userName: userName,
-        userEmail: userEmail,
-        
-        //zak: zakToken,
-      }).catch((error)=>console.log(error)
-      )
-      console.log("joined successfully");
-    } catch (error) {
-      console.log(error);
-    }
+  function startMeeting(signature: string) {
+    document.getElementById("zmmtg-root")!.style.display = "block";
+
+    ZoomMtg.init({
+      leaveUrl:"http://localhost:5173/level/elementary/subject/fifth-year-arabic/meeting",
+      patchJsMedia: true,
+      leaveOnPageUnload: true,
+      success: (success: unknown) => {
+        console.log(success);
+        // can this be async?
+        ZoomMtg.join({
+          signature: signature,
+          sdkKey: sdkKey,
+          meetingNumber: meetingNumber,
+          passWord: passWord,
+          userName: userName,
+          userEmail: userEmail,
+          disableInvite: true,
+          success: (success: unknown) => {
+            console.log(success);
+          },
+          error: (error: unknown) => {
+            console.log(error);
+          },
+        });
+      },
+      error: (error: unknown) => {
+        console.log(error);
+      },
+    });
   }
+
+  // useEffect to check acceptance status
+  {/*useEffect(() => {
+    const docRef = doc(db, 'E-groups', "first-year-science-m1"); // Reference to the e-Groups document
+
+    const unsubscribe = onSnapshot(docRef, (doc) => {
+      const data = doc.data();
+      if (data) {
+        const teacher = data.teachers.find(t => t.teacherId === "tch1");
+        if (teacher) {
+          const livestream = teacher.livestreams.find(ls => ls.streamId === "str1");
+          if (livestream) {
+            const request = livestream.requests.find(r => r.studentId === "std1");
+            if (request) {
+              if (request.status === 'accepted') {
+                setIsAccepted(true); // Set accepted status
+              } else if (request.status === 'rejected') {
+                alert("You have been kicked out of the meeting. Please contact the school."); // Alert on rejection
+                window.location.href = "/previous-screen"; // Redirect to previous screen
+              }
+            }
+          }
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe(); // Cleanup
+    };
+  }, []);*/}
 
   return (
     <div className="App">
-      <main>
+    <main>
       <h1>Zoom Meeting SDK Sample React</h1>
-        {/* For Component View */}
-        <div id="meetingSDKElement">
-          {/* Zoom Meeting SDK Component View Rendered Here */}
-        </div>
-        <button onClick={getSignature}>Join Meeting</button>
-      </main>
-    </div>
+      {/*isAccepted && <button onClick={getSignature}>Join Meeting</button>*/}
+      { <button onClick={getSignature}>Join Meeting</button>}
+    </main>
+  </div>
   );
 }
 

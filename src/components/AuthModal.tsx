@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import WaitingModal from './WaitingModal';
+import { auth, db } from '../../firebase/firebaseConfig';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
 
 
 interface AuthModalProps {
@@ -15,64 +18,95 @@ export default function AuthModal({ isOpen, onClose, contentType }: AuthModalPro
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [showWaiting, setShowWaiting] = useState(false);
+  const [user,setUser]=useState(null)
   const navigate = useNavigate();
-  const  isSubscribed=true ;
-  const { levelId } = useParams<{ levelId: string }>();
+  const { levelId,subjectId } = useParams<{ levelId: string;subjectId: string }>();
 
   if (!isOpen) return null;
 
   // Parse content type to get teacher ID
   const [type, contentId] = contentType.split('/');
   const teacherId = contentId?.split('-')[0];
+  const strId = contentId?.split('-')[1];
 
-  // Extract grade and subject from the path
-  const pathParts = window.location.pathname.split('/');
-  const levelIndex = pathParts.indexOf('level');
-  const subjectIndex = pathParts.indexOf('subject');
-  
-  const gradeId = pathParts[levelIndex + 2] || '';
-  const fullSubjectId = pathParts[subjectIndex + 1] || '';
-  
-  // Parse subject ID to get branch and base subject
-  const subjectParts = fullSubjectId.split('-');
-  const branchId = subjectParts.length === 3 ? subjectParts[1] : undefined;
-  const subjectId = subjectParts[subjectParts.length - 1];
+
+
+ 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(''); // Clear any previous errors
-    
-    // First check credentials
-    if (email === 'admin@admin.com' && password === '12345678') {
-      // Then check subscription
-      const hasSubscription =true;
+    try {
+      setError(''); // Clear previous errors
   
-      if (!hasSubscription) {
-        setError('You need to subscribe to this teacher\'s course to access their content.');
+      // Sign in user
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+  
+      if (!user) {
+        setError('Invalid email or password.');
         return;
       }
-
-      // If all checks pass, proceed with content access
-      if (type === 'stream') {
-        setShowWaiting(true);
-      } else {
-        onClose();
-        navigate(`/watch/${contentType}`);
+  
+      // Generate session token
+      const userAgent = navigator.userAgent;
+      const ipResponse = await fetch('https://api.ipify.org?format=json');
+      const { ip } = await ipResponse.json();
+      const sessionToken = `${user.uid}-${userAgent}-${ip}`;
+  
+      // Firestore session reference
+      const userDocRef = doc(db, 'sessions', user.uid);
+      const userDoc = await getDoc(userDocRef);
+  
+      if (userDoc.exists()) {
+        const storedToken = userDoc.data()?.sessionToken;
+  
+        if (storedToken && storedToken !== sessionToken) {
+          alert('You are already signed in on another device or browser.');
+          return;
+        }
       }
-    } else {
-      setError('Invalid email or password');
+  
+      // Save session token to Firestore
+      await setDoc(userDocRef, { sessionToken });
+      const groupDocRef = doc(db, "E-groups", subjectId, "groups", teacherId);
+
+      // Fetch the document
+      const groupDoc = await getDoc(groupDocRef);
+      const groupData = groupDoc.data();
+  
+      // Check if the user is in the students array
+      if (!groupData?.students || !groupData.students.includes(user.uid)) {
+        setUser(user.uid)
+        setShowWaiting(true);
+        setError('You need to subscribe to this teacher\'s course to access their content.');
+        return null;
+      }
+  
+      // Handle access based on type
+      if (type === 'stream') {
+        setUser(user.uid)
+           setShowWaiting(true);
+      }else {
+        onClose(); // Close modal or UI element
+        navigate(`/watch/${contentType}`); // Navigate to content page
+      }
+    } catch (err: any) {
+      console.error('Error during sign-in:', err);
+      setError(err.message || 'An error occurred during sign-in.');
     }
   };
 
   const handleHostAccept = () => {
     onClose();
-    navigate(`/watch/${contentType}`);
+    navigate(`/level/${levelId}/subject/${subjectId}/meeting`);
   };
 
   if (showWaiting) {
     return (
       <WaitingModal
       teacherId={teacherId}
+      streamId={strId}
+      studentId={user}
         onAccepted={handleHostAccept}
         onCancel={() => {
           setShowWaiting(false);

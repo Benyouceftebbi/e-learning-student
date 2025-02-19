@@ -35,7 +35,7 @@ export default function LevelPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 overflow-y-auto" style={{ maxHeight: '100vh' }}>
       <BackButton themeColor={themeColor} />
       
       <div className="flex items-center mb-8">

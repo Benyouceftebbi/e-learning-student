@@ -110,8 +110,10 @@ export const subjectData: Record<string, {
         id: 'live-h1-1',
         title: 'Physics Lab Demonstration',
         scheduledFor: 'Next Monday at 11:00 AM',
-        thumbnail: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&q=80'
+        thumbnail: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&q=80',
+        requests:[]
       }]
+      ,students:[]
     },
     {
       id: 'h1-math-g2',

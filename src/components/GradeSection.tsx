@@ -43,7 +43,7 @@ export default function GradeSection({
   };
 
   return (
-    <div className={`bg-white rounded-lg shadow-lg p-8 border border-${themeColor}/10`}>
+    <div className={`bg-white rounded-lg shadow-lg p-8 border border-${themeColor}/10 overflow-y-auto max-h-[500px]`}>
       <h2 className={`text-2xl font-bold text-${themeColor} mb-6`}>{name}</h2>
       
       {branches ? (

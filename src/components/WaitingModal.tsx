@@ -2,14 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import { db } from '../../firebase/firebaseConfig'; // Import your Firestore configuration
-import { doc, onSnapshot } from 'firebase/firestore'; // Import Firestore functions
+import { addDoc, doc, getDoc, onSnapshot, setDoc } from 'firebase/firestore'; // Import Firestore functions
 
 interface WaitingModalProps {
   onAccepted: () => void;
   onCancel: () => void;
   teacherId:string;
   streamId:string;
-  studentId:string
+  studentId:string | null
 }
 
 export default function WaitingModal({ onAccepted, onCancel,teacherId,streamId,studentId }: WaitingModalProps) {
@@ -17,46 +17,62 @@ export default function WaitingModal({ onAccepted, onCancel,teacherId,streamId,s
   const {subjectId } = useParams<{ subjectId: string }>();
 
   useEffect(() => {
-    // Firestore document reference
-    const docRef = doc(db, 'E-groups', "first-year-science-m1"); // Reference to the e-Groups document
-
-    // Listen for changes in the document
-    const unsubscribe = onSnapshot(docRef, (doc) => {
-      const data = doc.data();
-      if (data) {
-        const teacher = data.teachers.find(t => t.teacherId === "tch1");
- 
-     
-        if (teacher) {
-          const livestream = teacher.livestreams.find(ls => ls.streamId === "str1");
- 
-          if (livestream) {
-            const request = livestream.requests.find(r => r.studentId === "std1");
-         
-           
-            if (request) {
-             
-              if (request.status === 'accepted') {
-                onAccepted(); // Trigger accepted callback
-              } else if (request.status === 'rejected') {
-                onCancel(); // Trigger rejected callback
-              }
+    let unsubscribe: (() => void) | null = null;
+  
+    const setupListener = async () => {
+      try {
+        const requestDocRef = doc(
+          db,
+          "E-groups",
+          subjectId,
+          "groups",
+          teacherId,
+          "livestreams",
+          streamId,
+          "requests",
+          studentId
+        );
+  
+        // Check if the document exists
+        const docSnap = await getDoc(requestDocRef);
+  
+        if (!docSnap.exists()) {
+          // Create the document if it doesn't exist
+          await setDoc(requestDocRef, {
+            studentId: studentId,
+            status: "waiting",
+          });
+        }
+  
+        // Listen for changes in the document
+        unsubscribe = onSnapshot(requestDocRef, (doc) => {
+          const data = doc.data();
+          if (data) {
+            if (data.status === "accepted") {
+              onAccepted(); // Trigger accepted callback
+            } else if (data.status === "rejected") {
+              onCancel(); // Trigger rejected callback
             }
           }
-        }
+        });
+      } catch (error) {
+        console.error("Error setting up Firestore listener:", error);
       }
-    });
-
-
-
+    };
+  
+    // Call the setup function
+    setupListener();
+  
     // Update wait time every second
     const interval = setInterval(() => {
-      setWaitTime(prev => prev + 1);
+      setWaitTime((prev) => prev + 1);
     }, 1000);
-
+  
     // Cleanup function
     return () => {
-      unsubscribe(); // Unsubscribe from Firestore listener
+      if (unsubscribe) {
+        unsubscribe(); // Unsubscribe from Firestore listener
+      }
       clearInterval(interval);
     };
   }, [onAccepted, onCancel, subjectId, teacherId, streamId, studentId]);
